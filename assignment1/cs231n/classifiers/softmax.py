@@ -23,14 +23,27 @@ def softmax_loss_naive(W, X, y, reg):
   # Initialize the loss and gradient to zero.
   loss = 0.0
   dW = np.zeros_like(W)
-
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
   #############################################################################
   # TODO: Compute the softmax loss and its gradient using explicit loops.     #
   # Store the loss in loss and the gradient in dW. If you are not careful     #
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  for i in range(num_train):
+    scores = X[i].dot(W)
+    scores -= np.max(scores)
+    correct_class_score = scores[y[i]]
+    loss += - correct_class_score + np.log(np.sum(np.exp(scores)))
+    dW += np.outer(X[i], np.exp(scores) / np.sum(np.exp(scores)))
+    dW[:, y[i]] -= X[i]
+
+  loss /= num_train
+  loss += reg * np.sum(W * W)
+  dW /= num_train
+  dW += 2 * reg * W
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -54,7 +67,22 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  num_train = X.shape[0]
+  num_classes = W.shape[1]
+  XW = X.dot(W)
+  XW -= np.amax(XW, axis=1).reshape([-1, 1])    # (N, C)
+  
+  loss += np.sum(-XW[range(num_train), y])
+  loss += np.sum(np.log(np.sum(np.exp(XW), axis=1)))
+  loss /= num_train
+  loss += reg * np.sum(W * W)
+
+  dW += np.transpose(X).dot(np.exp(XW) / np.sum(np.exp(XW), axis=1).reshape([-1, 1]))
+  index = np.zeros_like(XW)
+  index[range(num_train), y] = 1
+  dW -= np.transpose(X).dot(index)
+  dW /= num_train
+  dW += 2 * reg * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################

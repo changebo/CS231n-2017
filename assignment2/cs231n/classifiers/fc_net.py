@@ -175,10 +175,16 @@ class FullyConnectedNet(object):
         ############################################################################
         self.params['W1'] = np.random.normal(scale=weight_scale, size=[input_dim, hidden_dims[0]])
         self.params['b1'] = np.zeros(hidden_dims[0])
+        if self.use_batchnorm:
+            self.params['gamma1'] = np.ones(hidden_dims[0])
+            self.params['beta1'] = np.zeros(hidden_dims[0])
 
         for i in range(1, self.num_layers-1):
             self.params['W'+str(i+1)] = np.random.normal(scale=weight_scale, size=[hidden_dims[i-1], hidden_dims[i]])
             self.params['b'+str(i+1)] = np.zeros(hidden_dims[i])
+            if self.use_batchnorm:
+                self.params['gamma'+str(i+1)] = np.ones(hidden_dims[i])
+                self.params['beta'+str(i+1)] = np.zeros(hidden_dims[i])
 
         self.params['W'+str(self.num_layers)] = np.random.normal(scale=weight_scale, size=[hidden_dims[i], num_classes])
         self.params['b'+str(self.num_layers)] = np.zeros(num_classes)        
@@ -241,19 +247,30 @@ class FullyConnectedNet(object):
         ############################################################################
         n_layers = self.num_layers
         
-        out = {}
-        cache = {}
-        dout = {}
+        out_affine = {}
+        out_bn = {}
+        out_relu = {}
+        cache_affine = {}
+        cache_bn = {}
+        cache_relu = {}
 
-        out[0] = X
+        out_relu[0] = X
         for i in range(1, n_layers):
             W = self.params['W'+str(i)]
             b = self.params['b'+str(i)]
-            out[i], cache[i] = affine_relu_forward(out[i-1], W, b)
-        out[n_layers], cache[n_layers] = affine_forward(out[self.num_layers-1],
+            if self.use_batchnorm:
+                gamma = self.params['gamma'+str(i)]
+                beta = self.params['beta'+str(i)]
+                out_affine[i], cache_affine[i] = affine_forward(out_relu[i-1], W, b)
+                out_bn[i], cache_bn[i] = batchnorm_forward(out_affine[i], gamma, beta, self.bn_params[i-1])
+                out_relu[i], cache_relu[i] = relu_forward(out_bn[i])
+            else:
+                out_relu[i], cache_relu[i] = affine_relu_forward(out_relu[i-1], W, b)
+
+        out_affine[n_layers], cache_affine[n_layers] = affine_forward(out_relu[n_layers-1],
                                                             self.params['W'+str(n_layers)],
                                                             self.params['b'+str(n_layers)])
-        scores = out[n_layers]
+        scores = out_affine[n_layers]
 
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -277,13 +294,22 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
+        dout = {}
+
         loss, d_loss = softmax_loss(scores, y)
-        dout[n_layers], grads['W'+str(n_layers)], grads['b'+str(n_layers)] = affine_backward(d_loss, cache[n_layers])
+        dout[n_layers], grads['W'+str(n_layers)], grads['b'+str(n_layers)] = affine_backward(d_loss, cache_affine[n_layers])
+
         loss += 0.5 * self.reg * np.linalg.norm(self.params['W'+str(n_layers)]) ** 2
         grads['W'+str(n_layers)] += self.reg * self.params['W'+str(n_layers)]
 
         for i in range(n_layers-1, 0, -1):
-            dout[i], grads['W'+str(i)], grads['b'+str(i)] = affine_relu_backward(dout[i+1], cache[i])
+            if self.use_batchnorm:
+                drelu = relu_backward(dout[i+1], cache_relu[i])
+                dbn, grads['gamma'+str(i)], grads['beta'+str(i)] = batchnorm_backward(drelu, cache_bn[i])
+                dout[i], grads['W'+str(i)], grads['b'+str(i)] = affine_backward(dbn, cache_affine[i])
+            else:
+                dout[i], grads['W'+str(i)], grads['b'+str(i)] = affine_relu_backward(dout[i+1], cache_relu[i])
+            
             loss += 0.5 * self.reg * np.linalg.norm(self.params['W'+str(i)]) ** 2
             grads['W'+str(i)] += self.reg * self.params['W'+str(i)]
 

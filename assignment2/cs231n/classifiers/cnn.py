@@ -91,7 +91,6 @@ class ThreeLayerConvNet(object):
         ############################################################################
         N, C, H, W = X.shape
         out, cache1 = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
-        out = out.reshape([N, -1])
         out, cache2 = affine_relu_forward(out, W2, b2)
         out, cache3 = affine_forward(out, W3, b3)
         scores = out
@@ -116,7 +115,6 @@ class ThreeLayerConvNet(object):
 
         dout, grads['W3'], grads['b3'] = affine_backward(dout, cache3)
         dout, grads['W2'], grads['b2'] = affine_relu_backward(dout, cache2)
-        dout = dout.reshape([N, -1, H//2, W//2])
         dout, grads['W1'], grads['b1'] = conv_relu_pool_backward(dout, cache1)
 
         grads['W1'] += self.reg * W1

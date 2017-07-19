@@ -586,6 +586,7 @@ def spatial_batchnorm_backward(dout, cache):
     N, C, H, W = dout.shape
     dout_vec = dout.reshape([N, -1])
     dx_vec, dgamma_vec, dbeta_vec = batchnorm_backward(dout_vec, cache)
+    # TODO: fix this!!
     dx = dx_vec.reshape(dout.shape)
     dgamma = dgamma_vec.reshape([C, H*W]).sum(axis=1)
     dbeta = dbeta_vec.reshape([C, H*W]).sum(axis=1)
